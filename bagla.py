@@ -98,6 +98,8 @@ async def main():
                             await relay.siteden(json.loads(msg.data))
                     if relay.bot:
                         await relay.bot.close()
+                    if ws.close_code == 4009:
+                        sys.exit("Bu isimde baska bir bot zaten bagli. Sitede farkli isimle kayit ol.")
             print("Baglanti koptu, 3 sn sonra tekrar deneniyor...", flush=True)
         except aiohttp.WSServerHandshakeError as e:
             if e.status == 401:
