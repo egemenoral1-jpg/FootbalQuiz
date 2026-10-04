@@ -1,0 +1,14 @@
+# Render.com "Blueprint": repoyu Render'a baglayinca site otomatik kurulur.
+services:
+  - type: web
+    name: footbalquiz
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -X utf8 -m server.app
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.7
+      - key: TOKEN_SECRET
+        generateValue: true
