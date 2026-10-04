@@ -88,9 +88,7 @@ class FootballDB:
             if tid:
                 self.team_index[k] = tid
 
-        # Oyuncu isim anahtarlari (tam isim + takma adlar)
-        self.player_keys = {pid: {norm(n) for n in [v[0], *v[2]]}
-                            for pid, v in self.players.items()}
+        self._player_keys = {}
 
     # --- takimlar ---
     def resolve_team(self, text):
@@ -115,6 +113,14 @@ class FootballDB:
     def fame(self, pid):
         return self.players[pid][1]
 
+    def player_keys(self, pid):
+        """Oyuncu isim anahtarlari (tam isim + takma adlar). Bellek icin tembel."""
+        keys = self._player_keys.get(pid)
+        if keys is None:
+            v = self.players[pid]
+            keys = self._player_keys[pid] = {norm(n) for n in [v[0], *v[2]]}
+        return keys
+
     def match_player(self, answer, candidates):
         """Cevabi aday oyuncularla eslestirir. Tam isim/takma ad ya da
         adaylar icinde tek olan soyad kabul edilir. Bulamazsa None."""
@@ -123,7 +129,7 @@ class FootballDB:
             return None
         surname_hits = []
         for pid in candidates:
-            keys = self.player_keys[pid]
+            keys = self.player_keys(pid)
             if a in keys:
                 return pid
             if any(k.split()[-1] == a for k in keys if k):
