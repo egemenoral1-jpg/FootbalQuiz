@@ -6,6 +6,7 @@ Ortam:     PORT, DB_YOLU (sqlite dosyasi)
 """
 import asyncio
 import collections
+import gc
 import hashlib
 import hmac
 import itertools
@@ -266,8 +267,8 @@ class Site:
             # Ayni isimle baska biri bagli: o isim su an onun
             await ws.close(code=4009, message=b"Bu isimde baska bir bot bagli")
             return ws
-        if eski:  # ayni bot yeniden baglandi: eski baglantiyi kapat
-            await eski.ws.close()
+        if eski:  # ayni bot yeniden baglandi: eskisi kapanir ve tekrar denemez
+            await eski.ws.close(code=4010, message=b"Baska yerden baglanildi")
         bot = RemoteBot(ad, ws)
         bot.token = self.token(req)
         self.online[ad] = bot
@@ -318,6 +319,9 @@ def make_app():
     store = Store(os.environ.get("DB_YOLU", os.path.join(HERE, "site.db")))
     print("Futbol veritabani yukleniyor...", flush=True)
     site = Site(store, FootballDB())
+    # Buyuk veriyi cop toplayicidan cikar: olcum sirasinda GC duraksamasi olmasin
+    gc.collect()
+    gc.freeze()
     app = web.Application()
     app.add_routes([
         web.get("/", site.index),
