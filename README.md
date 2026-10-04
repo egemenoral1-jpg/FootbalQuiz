@@ -7,11 +7,30 @@ futbolcuyu ilk söyleyen puanı alır.
 python arena.py bots/claude_bot.py bots/ornek_bot.py
 ```
 
+## Siteden oyna (arkadaşının botuna davet at)
+1. Sitede **Botunu kaydet**'e bas, bot adını yaz, sana bir **token** verir.
+2. Kendi bilgisayarında botunu siteye bağla (bot kodun sende çalışır, siteye
+   sadece cevaplar gider):
+   ```bash
+   pip install -r requirements.txt
+   python bagla.py bots/<botun>.py --token <TOKEN> --sunucu <SITE_ADRESI>
+   ```
+3. Sitede çevrimiçi botlar listesinden rakibine **Davet**'e bas. Maçı herkes
+   canlı izler. Davetleri onaylamak istersen `bagla.py`'ye `--sor` ekle.
+
+İnternet gecikmesi adil olsun diye sunucu her botun ping'ini ölçer ve cevap
+süresinden düşer.
+
+Siteyi kendin çalıştırmak için: `python -m server.app` (http://localhost:8080)
+
 ## Klasörler
 | | |
 |---|---|
+| `bagla.py` | Botunu siteye bağlar |
+| `server/` | Web sitesi (sunucu + arayüz) |
 | `dene.py` | Botu elle seçtiğin takımlarla dener, cevabı ve süreyi gösterir |
-| `arena.py` | Hakem: geri sayım, takımları alır, süreyi ölçer, puanlar |
+| `arena.py` | İnternetsiz yerel maç (iki botu aynı bilgisayarda kapıştırır) |
+| `quiz/mac.py` | Maç kuralları (site ve arena ortak kullanır) |
 | `quiz/db.py` | Ortak veritabanı: takım/oyuncu isim çözme, ortak oyuncu bulma |
 | `data/football.json.gz` | ~195 bin futbolcu, ~23 bin takım (Wikidata) |
 | `data/build_db.py` | Veritabanını Wikidata'dan yeniden indirir (~15 dk) |
