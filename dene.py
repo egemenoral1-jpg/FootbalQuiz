@@ -5,19 +5,23 @@
 
 Botun cevabini, suresini ve hakemin dogru sayip saymayacagini gosterir.
 """
+import asyncio
 import sys
 import time
 
-from arena import BotProcess, B, G, R, DIM, X
+from arena import B, G, R, DIM, X
 from quiz.db import FootballDB
+from quiz.mac import drain
+from quiz.yerel import LocalBot
 
 
-def ask(db, bot, t1, t2):
-    bot.drain()
+async def ask(db, bot, t1, t2):
+    drain(bot)
     t0 = time.perf_counter()
-    bot.send({"type": "question", "round": 1, "teams": [t1, t2], "used": []})
-    t, msg = bot.recv(timeout=10)
-    if msg is None:
+    await bot.send({"type": "question", "round": 1, "teams": [t1, t2], "used": []})
+    try:
+        t, msg = await asyncio.wait_for(bot.inbox.get(), 10)
+    except asyncio.TimeoutError:
         print(f"  {R}cevap gelmedi (10 sn){X}")
         return
     ans = msg.get("player")
@@ -36,29 +40,30 @@ def ask(db, bot, t1, t2):
         print(f"  {DIM}dogrular: {', '.join(db.player_name(p) for p in ornek)}{X}")
 
 
-def main():
+async def main():
     if len(sys.argv) < 2:
         sys.exit(__doc__)
     db = FootballDB()
-    bot = BotProcess(sys.argv[1])
-    bot.send({"type": "hello", "you": bot.name, "opponent": "dene", "rounds": 1})
-    bot.recv(timeout=120)
+    bot = await LocalBot(sys.argv[1]).start()
+    await bot.send({"type": "hello", "you": bot.name, "opponent": "dene", "rounds": 1})
+    await asyncio.wait_for(bot.inbox.get(), 120)
 
     if len(sys.argv) >= 4:
-        ask(db, bot, sys.argv[2], sys.argv[3])
+        await ask(db, bot, sys.argv[2], sys.argv[3])
     else:
         print("Iki takimi virgulle yaz (orn: gs, fb). Cikmak icin bos birak.")
         while True:
-            line = input("> ").strip()
+            line = (await asyncio.to_thread(input, "> ")).strip()
             if not line:
                 break
             if "," not in line:
                 print("  virgulle ayir: Galatasaray, Real Madrid")
                 continue
             t1, t2 = (s.strip() for s in line.split(",", 1))
-            ask(db, bot, t1, t2)
-    bot.close()
+            await ask(db, bot, t1, t2)
+    await bot.send({"type": "end"})
+    await bot.close()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
