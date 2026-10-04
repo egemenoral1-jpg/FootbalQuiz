@@ -5,6 +5,9 @@ Hiz icin:
   - Soru gelince kucuk takimin listesinde yurunur, diger takimda oynamis
     ilk (yani en unlu) oyuncu bulunur bulunmaz cevap verilir.
   - Takim isimlerinin cozumu onbellekte tutulur.
+  - Kendi soyleyecegimiz her takim icin, olasi her rakip takimla ortak oyuncular
+    acilista hazirlanir. Soru gelince tek sozluk bakisiyla cevap: en kotu
+    durumda bile ~1 mikrosaniye.
   - Veri yuklendikten sonra gc.freeze(): 200 bin nesneyi tarayan cop toplayici
     tam cevap verirken araya girip milisaniyeler kaybettirmesin.
   - `Bot.handle` sayesinde bagla.py bu botu ayri surec acmadan, kendi icinde
@@ -29,13 +32,31 @@ class Bot:
         big = sorted(db.teams, key=lambda t: self.size.get(t, 0) * db.teams[t][1],
                      reverse=True)[:60]
         conn = {t: sum(1 for u in big if u != t and db.links[t] & db.links[u]) for t in big}
-        self.pick_pool = [db.team_name(t) for t in sorted(big, key=conn.get, reverse=True)[:20]]
+        pool_ids = sorted(big, key=conn.get, reverse=True)[:20]
+        self.pick_pool = [db.team_name(t) for t in pool_ids]
+        self.ready = self._hazirla(pool_ids)
 
         self.resolve_cache = {}
         self.used = set()
         self.name_to_pids = None
         gc.collect()
         gc.freeze()
+
+    def _hazirla(self, pool_ids):
+        """{bizim_takim: {rakip_takim: [unlu_luge gore ortak oyuncular]}}"""
+        db = self.db
+        player_teams = {p: [] for T in pool_ids for p in db.links[T]}
+        for t, ps in db.links.items():
+            for p in ps:
+                if p in player_teams:
+                    player_teams[p].append(t)
+        ready = {}
+        for T in pool_ids:
+            d = ready[T] = {}
+            for p in self.by_fame[T]:
+                for u in player_teams[p]:
+                    d.setdefault(u, []).append(p)
+        return ready
 
     def resolve(self, text):
         tid = self.resolve_cache.get(text, 0)
@@ -48,6 +69,16 @@ class Bot:
         if not t1 or not t2:
             return None
         used = self.used
+        # Hazir tablo: takimlardan biri bizim havuzdan ise tek bakis
+        hazir = self.ready.get(t1)
+        rakip = t2
+        if hazir is None:
+            hazir, rakip = self.ready.get(t2), t1
+        if hazir is not None:
+            for p in hazir.get(rakip, ()):
+                if p not in used:
+                    return p
+            return None
         if t1 == t2:
             for p in self.by_fame[t1]:
                 if p not in used:
