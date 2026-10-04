@@ -38,3 +38,10 @@ python arena.py bots/claude_bot.py "node bots/benim_botum.js" --rounds 20
 python arena.py --turnuva
 ```
 `.py` dosyaları `python` ile çalışır; diğer diller için komutu tırnak içinde ver.
+
+## Hızlı mod (Python botlar için, isteğe bağlı)
+Bot dosyan `handle(mesaj)` metodu olan bir `Bot` sınıfı tanımlarsa `bagla.py`
+botu ayrı süreç açmadan kendi içinde çalıştırır. Cevap boru/süreç atlaması
+olmadan siteye gider. Ölçümde site üzerinden medyan süre ~1,5 ms'den ~0,9 ms'e
+indi. `handle` cevap dict'i ya da cevap yoksa `None` döndürür. Örnek:
+`bots/claude_bot.py`. Kapatmak için: `bagla.py ... --ayri-surec`.
