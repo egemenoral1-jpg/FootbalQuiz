@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FootbalQuiz Arena</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;900&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0b1410; --panel: #111d17; --panel2: #16251d; --line: #23382c;
+  --text: #e8f1ea; --muted: #8aa595; --pitch: #2fbf71; --pitch-dim: #1d6e45;
+  --gold: #f3c74f; --red: #f0625a; --blue: #5aa9f0;
+  --radius: 14px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font-family: Archivo, system-ui, sans-serif; min-height: 100vh; }
+body::before { content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .05;
+  background: repeating-linear-gradient(90deg, #fff 0 60px, transparent 60px 120px); }
+button { font: inherit; cursor: pointer; border: 0; border-radius: 10px; }
+input, select { font: inherit; color: var(--text); background: var(--panel2);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; width: 100%; }
+.mono { font-family: "JetBrains Mono", monospace; }
+.muted { color: var(--muted); }
+
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 16px 24px; border-bottom: 1px solid var(--line); position: relative; }
+.logo { font-weight: 900; font-size: 22px; letter-spacing: -.5px; }
+.logo span { color: var(--pitch); }
+.me { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.btn { background: var(--pitch); color: #04140b; font-weight: 700; padding: 9px 16px; }
+.btn:hover { filter: brightness(1.1); }
+.btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+
+main { display: grid; grid-template-columns: 300px 1fr; gap: 20px; padding: 20px 24px;
+  max-width: 1280px; margin: 0 auto; position: relative; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 16px; }
+.panel h2 { margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px;
+  color: var(--muted); font-weight: 700; display: flex; justify-content: space-between; }
+aside { display: flex; flex-direction: column; gap: 20px; }
+
+.bot { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 10px; }
+.bot + .bot { border-top: 1px solid var(--line); }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--pitch);
+  box-shadow: 0 0 10px var(--pitch); flex: none; }
+.dot.busy { background: var(--gold); box-shadow: 0 0 10px var(--gold); }
+.bot .ad { font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.bot .ping { font-size: 11px; }
+.bot .btn { padding: 6px 12px; font-size: 13px; }
+.empty { color: var(--muted); font-size: 14px; padding: 8px 2px; line-height: 1.5; }
+
+.history a { display: flex; justify-content: space-between; gap: 8px; padding: 8px 6px;
+  color: var(--text); text-decoration: none; font-size: 14px; border-radius: 8px; }
+.history a:hover { background: var(--panel2); }
+.history .sc { font-weight: 700; white-space: nowrap; }
+
+/* sahne */
+.tabs { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.tab { background: var(--panel2); color: var(--text); padding: 6px 12px; font-size: 13px; }
+.tab.on { background: var(--pitch); color: #04140b; font-weight: 700; }
+.tab.on .live { color: #7a0d08; } .tab.on .live::before { background: #7a0d08; }
+.live { display: inline-flex; align-items: center; gap: 6px; color: var(--red); font-weight: 700;
+  font-size: 12px; letter-spacing: 1px; }
+.live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--red);
+  animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: .2; } }
+
+.stage { background: linear-gradient(180deg, #123322, #0d2419); border: 1px solid var(--pitch-dim);
+  border-radius: var(--radius); padding: 24px; position: relative; overflow: hidden; min-height: 420px; }
+.stage::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px;
+  background: rgba(255,255,255,.07); }
+.stage::before { content: ""; position: absolute; left: 50%; top: 50%; width: 180px; height: 180px;
+  border: 2px solid rgba(255,255,255,.07); border-radius: 50%; transform: translate(-50%,-50%); }
+.board { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px;
+  position: relative; z-index: 1; }
+.side { text-align: center; }
+.side .name { font-size: 20px; font-weight: 900; overflow-wrap: anywhere; }
+.side .score { font-size: 64px; font-weight: 900; line-height: 1; margin-top: 6px; }
+.side.a .score { color: var(--blue); } .side.b .score { color: var(--red); }
+.center { text-align: center; min-width: 120px; }
+.round { color: var(--muted); font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
+.count { font-size: 96px; font-weight: 900; color: var(--gold); line-height: 1; height: 100px; }
+.count.pop { animation: pop .6s ease-out; }
+@keyframes pop { 0% { transform: scale(1.8); opacity: 0; } 40% { opacity: 1; } 100% { transform: scale(1); } }
+
+.picks { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 18px;
+  position: relative; z-index: 1; }
+.card { background: rgba(0,0,0,.28); border: 1px solid rgba(255,255,255,.08); border-radius: 12px;
+  padding: 14px; min-height: 120px; }
+.card .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+.card .team { font-size: 20px; font-weight: 700; margin: 4px 0 12px; }
+.card .team.bad { color: var(--red); text-decoration: line-through; }
+.card .ans { font-size: 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tag { font-size: 11px; font-weight: 700; padding: 3px 7px; border-radius: 6px; }
+.tag.ok { background: var(--pitch); color: #04140b; } .tag.no { background: var(--red); color: #fff; }
+.card .ms { font-size: 12px; color: var(--muted); }
+.card.win { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold), 0 0 24px rgba(243,199,79,.25); }
+.verdict { text-align: center; margin-top: 16px; font-size: 16px; min-height: 24px; position: relative; z-index: 1; }
+.verdict b { color: var(--gold); }
+.placeholder { position: relative; z-index: 1; text-align: center; padding: 60px 16px; }
+.placeholder h3 { font-size: 26px; margin: 0 0 8px; }
+
+.log { margin-top: 20px; }
+.log .row { display: grid; grid-template-columns: 54px 1fr auto; gap: 10px; padding: 8px 6px;
+  border-top: 1px solid var(--line); font-size: 14px; align-items: center; }
+.log .row .w { font-weight: 700; color: var(--gold); white-space: nowrap; }
+
+/* modal */
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none;
+  align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+.modal.open { display: flex; }
+.dialog { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 22px; width: 100%; max-width: 460px; }
+.dialog h3 { margin: 0 0 14px; }
+.dialog .row { display: flex; gap: 8px; margin: 10px 0; }
+.dialog .row > * { flex: 1; }
+.code { background: #07100c; border: 1px solid var(--line); border-radius: 10px; padding: 12px;
+  font-family: "JetBrains Mono", monospace; font-size: 12px; overflow-wrap: anywhere; margin: 8px 0; }
+.err { color: var(--red); font-size: 14px; min-height: 20px; }
+.seg { display: flex; gap: 6px; margin-bottom: 14px; }
+.seg button { flex: 1; background: var(--panel2); color: var(--text); padding: 8px; }
+.seg button.on { background: var(--pitch); color: #04140b; font-weight: 700; }
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--panel2);
+  border: 1px solid var(--line); padding: 10px 16px; border-radius: 10px; display: none; z-index: 20;
+  max-width: calc(100% - 32px); }
+
+@media (max-width: 860px) {
+  main { grid-template-columns: 1fr; padding: 16px; }
+  aside { order: 2; }
+  header { padding: 14px 16px; }
+  .side .score { font-size: 44px; } .count { font-size: 64px; height: 70px; }
+  .picks { grid-template-columns: 1fr; }
+  .stage { padding: 16px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Footbal<span>Quiz</span> <span class="muted" style="font-weight:500;font-size:14px">bot arenası</span></div>
+  <div class="me" id="me"></div>
+</header>
+
+<main>
+  <aside>
+    <section class="panel">
+      <h2>Çevrimiçi botlar <span id="botCount"></span></h2>
+      <div id="bots"></div>
+      <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+        <label class="muted" style="font-size:13px;white-space:nowrap" for="tur">Tur</label>
+        <select id="tur"><option>5</option><option selected>10</option><option>15</option><option>20</option></select>
+      </div>
+    </section>
+    <section class="panel history">
+      <h2>Son maçlar</h2>
+      <div id="history"><div class="empty">Henüz maç yok.</div></div>
+    </section>
+  </aside>
+
+  <section>
+    <div class="tabs" id="tabs"></div>
+    <div class="stage" id="stage"></div>
+    <div class="panel log" id="logPanel" style="display:none">
+      <h2>Turlar</h2>
+      <div id="log"></div>
+    </div>
+  </section>
+</main>
+
+<div class="modal" id="authModal">
+  <div class="dialog">
+    <div class="seg"><button id="segNew" class="on">Botunu kaydet</button><button id="segLogin">Token ile giriş</button></div>
+    <div id="formNew">
+      <input id="newName" placeholder="Bot adı (ör. egemen_bot)" maxlength="20">
+      <div class="row"><button class="btn" id="doRegister">Kaydet</button></div>
+    </div>
+    <div id="formLogin" style="display:none">
+      <input id="loginToken" placeholder="Token">
+      <div class="row"><button class="btn" id="doLogin">Giriş</button></div>
+    </div>
+    <div id="tokenOut" style="display:none">
+      <p>Botun kaydedildi. <b>Bu token'ı sakla</b>, bir daha gösterilmeyecek:</p>
+      <div class="code" id="tokenVal"></div>
+      <p class="muted" style="font-size:14px">Botunu siteye bağlamak için proje klasöründe:</p>
+      <div class="code" id="cmdVal"></div>
+      <div class="row"><button class="btn ghost" id="copyCmd">Komutu kopyala</button><button class="btn" id="closeAuth">Tamam</button></div>
+    </div>
+    <div class="err" id="authErr"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+                set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} } };
+
+let me = null, token = store.get("fq_token");
+let lobby = { botlar: [], canli: [] };
+const matches = {};          // no -> {a, b, olaylar: []}
+let watching = null;         // izlenen mac no ya da "kayit:<id>"
+
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.style.display = "block";
+  clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", 3500);
+}
+
+// ------------------------------------------------------------ giris
+async function checkMe() {
+  if (!token) return renderMe();
+  const r = await fetch("/api/ben", { headers: { Authorization: "Bearer " + token } });
+  if (r.ok) me = (await r.json()).ad; else { token = null; store.set("fq_token", null); }
+  renderMe(); renderBots();
+}
+function renderMe() {
+  $("#me").innerHTML = me
+    ? `<span class="muted">Botun:</span> <b>${esc(me)}</b> <button class="btn ghost" id="logout">Çıkış</button>`
+    : `<button class="btn" id="openAuth">Botunu kaydet / giriş</button>`;
+  if (me) $("#logout").onclick = () => { me = null; token = null; store.set("fq_token", null); renderMe(); renderBots(); };
+  else $("#openAuth").onclick = openAuth;
+}
+function openAuth() {
+  $("#authModal").classList.add("open"); $("#authErr").textContent = "";
+  $("#tokenOut").style.display = "none"; seg(true);
+}
+function seg(isNew) {
+  $("#segNew").classList.toggle("on", isNew); $("#segLogin").classList.toggle("on", !isNew);
+  $("#formNew").style.display = isNew ? "" : "none"; $("#formLogin").style.display = isNew ? "none" : "";
+}
+$("#segNew").onclick = () => seg(true);
+$("#segLogin").onclick = () => seg(false);
+$("#authModal").onclick = e => { if (e.target.id === "authModal") $("#authModal").classList.remove("open"); };
+$("#closeAuth").onclick = () => $("#authModal").classList.remove("open");
+$("#doRegister").onclick = async () => {
+  const r = await fetch("/api/kayit", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ad: $("#newName").value.trim() }) });
+  const j = await r.json();
+  if (!r.ok) return $("#authErr").textContent = j.hata;
+  token = j.token; me = j.ad; store.set("fq_token", token);
+  $("#formNew").style.display = $("#formLogin").style.display = "none";
+  $("#tokenVal").textContent = token;
+  $("#cmdVal").textContent = `python bagla.py bots/${me}.py --token ${token} --sunucu ${location.origin}`;
+  $("#tokenOut").style.display = ""; $("#authErr").textContent = "";
+  renderMe(); renderBots();
+};
+$("#copyCmd").onclick = () => navigator.clipboard?.writeText($("#cmdVal").textContent).then(() => toast("Kopyalandı"));
+$("#doLogin").onclick = async () => {
+  token = $("#loginToken").value.trim(); store.set("fq_token", token);
+  await checkMe();
+  if (me) $("#authModal").classList.remove("open"); else $("#authErr").textContent = "Token geçersiz";
+};
+
+// ------------------------------------------------------------ lobi
+function renderBots() {
+  const el = $("#bots");
+  $("#botCount").textContent = lobby.botlar.length || "";
+  if (!lobby.botlar.length) {
+    el.innerHTML = `<div class="empty">Şu an bağlı bot yok.<br>Botunu kaydet, sonra <span class="mono">bagla.py</span> ile bağla.</div>`;
+    return;
+  }
+  const mine = lobby.botlar.find(b => b.ad === me);
+  el.innerHTML = lobby.botlar.map(b => {
+    let action = "";
+    if (b.ad === me) action = `<span class="muted" style="font-size:12px">sen</span>`;
+    else if (me) action = `<button class="btn" data-davet="${esc(b.ad)}" ${b.mesgul || !mine || mine.mesgul ? "disabled" : ""}>Davet</button>`;
+    return `<div class="bot"><span class="dot ${b.mesgul ? "busy" : ""}"></span>
+      <span class="ad">${esc(b.ad)}</span><span class="ping mono muted">${b.ping} ms</span>${action}</div>`;
+  }).join("");
+  if (me && !mine) el.insertAdjacentHTML("beforeend",
+    `<div class="empty">Senin botun (${esc(me)}) bağlı değil. Davet atmak için önce <span class="mono">bagla.py</span>'yi çalıştır.</div>`);
+  el.querySelectorAll("[data-davet]").forEach(b => b.onclick = () => invite(b.dataset.davet, b));
+}
+async function invite(rakip, btn) {
+  btn.disabled = true; btn.textContent = "...";
+  const r = await fetch("/api/davet", { method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+    body: JSON.stringify({ rakip, tur: +$("#tur").value }) });
+  const j = await r.json();
+  if (!r.ok) { toast(j.hata); renderBots(); return; }
+  watching = j.no; renderStage();
+}
+
+async function loadHistory() {
+  const list = await (await fetch("/api/maclar")).json();
+  $("#history").innerHTML = list.length ? list.map(m =>
+    `<a href="#" data-id="${m.id}"><span>${esc(m.a)} – ${esc(m.b)}</span><span class="sc mono">${m.skor_a}-${m.skor_b}</span></a>`).join("")
+    : `<div class="empty">Henüz maç yok.</div>`;
+  $("#history").querySelectorAll("a").forEach(a => a.onclick = e => { e.preventDefault(); replay(+a.dataset.id); });
+}
+async function replay(id) {
+  const m = await (await fetch("/api/mac/" + id)).json();
+  const key = "kayit:" + id;
+  matches[key] = { a: m.a, b: m.b, olaylar: m.olaylar, bitti: true };
+  watching = key; renderStage();
+}
+
+// ------------------------------------------------------------ sahne
+function stateOf(m) {
+  const s = { skor: {}, tur: 0, toplam: 0, n: null, secim: {}, cevap: {}, verdict: "", kazanan: null, rows: [], bitti: false };
+  s.skor[m.a] = 0; s.skor[m.b] = 0;
+  for (const ev of m.olaylar) {
+    if (ev.ev === "basla") s.toplam = ev.tur_sayisi;
+    if (ev.ev === "geri_sayim") { s.tur = ev.tur; s.n = ev.n; s.secim = {}; s.cevap = {}; s.verdict = ""; s.kazanan = null; }
+    if (ev.ev === "takimlar") { s.n = null; ev.secimler.forEach(x => s.secim[x.bot] = x); }
+    if (ev.ev === "cevaplar") ev.cevaplar.forEach(x => s.cevap[x.bot] = x);
+    if (ev.ev === "tur_sonu") {
+      s.skor = ev.skor; s.kazanan = ev.kazanan;
+      const why = { dogru_cevap: `<b>${esc(ev.kazanan)}</b> bildi: ${esc(ev.oyuncu)}`,
+        gecersiz_takim: ev.kazanan ? `Geçersiz takım → puan <b>${esc(ev.kazanan)}</b>` : "İki takım da geçersiz",
+        ortak_oyuncu_yok: "Bu iki takımın ortak oyuncusu yok, tur geçersiz",
+        kimse_bilemedi: `Kimse bilemedi. Örnek: ${esc(ev.ornek)}` }[ev.neden];
+      s.verdict = why;
+      const picks = Object.values(s.secim).map(x => x.takim || x.soylenen).join(" + ");
+      s.rows.push({ tur: ev.tur, picks, w: ev.kazanan, oyuncu: ev.oyuncu });
+    }
+    if (ev.ev === "bitti") { s.skor = ev.skor; s.bitti = true; s.ort = ev.ort_ms; }
+  }
+  return s;
+}
+
+let lastCount = null;
+function renderStage() {
+  const tabs = lobby.canli.map(c => `<button class="tab ${watching === c.no ? "on" : ""}" data-no="${c.no}">
+      <span class="live">CANLI</span> ${esc(c.a)} – ${esc(c.b)}</button>`);
+  if (typeof watching === "string" && matches[watching]) tabs.push(`<button class="tab on">Tekrar: ${esc(matches[watching].a)} – ${esc(matches[watching].b)}</button>`);
+  $("#tabs").innerHTML = tabs.join("");
+  $("#tabs").querySelectorAll("[data-no]").forEach(b => b.onclick = () => { watching = +b.dataset.no; renderStage(); });
+
+  const m = matches[watching];
+  if (!m) {
+    $("#logPanel").style.display = "none";
+    $("#stage").innerHTML = `<div class="placeholder"><h3>3 · 2 · 1 …</h3>
+      <p class="muted">İki bot aynı anda birer takım söyler.<br>İki takımda da oynamış bir futbolcuyu ilk söyleyen puanı alır.</p>
+      <p class="muted" style="font-size:14px">${me ? "Soldan bir bota davet at." : "Botunu kaydet, bağla, arkadaşının botunu davet et."}</p></div>`;
+    return;
+  }
+  const s = stateOf(m);
+  const card = side => {
+    const p = s.secim[side], c = s.cevap[side];
+    let ans = `<span class="muted">${s.n ? "…" : p ? "düşünüyor…" : ""}</span>`;
+    if (c) ans = c.sure_doldu ? `<span class="tag no">SÜRE DOLDU</span>`
+      : `<span>${esc(c.cevap ?? "pas")}</span><span class="tag ${c.dogru ? "ok" : "no"}">${c.dogru ? "DOĞRU" : "YANLIŞ"}</span>
+         <span class="ms mono">${c.ms.toFixed(2)} ms</span>`;
+    return `<div class="card ${s.kazanan === side && !s.n ? "win" : ""}">
+      <div class="lbl">${esc(side)} söyledi</div>
+      <div class="team ${p && !p.takim ? "bad" : ""}">${p ? esc(p.soylenen ?? "—") : "&nbsp;"}</div>
+      <div class="ans">${ans}</div></div>`;
+  };
+  const countTxt = s.bitti ? "🏁" : s.n ?? "";
+  $("#stage").innerHTML = `
+    <div class="board">
+      <div class="side a"><div class="name">${esc(m.a)}</div><div class="score">${s.skor[m.a] ?? 0}</div></div>
+      <div class="center"><div class="round">${s.bitti ? "Maç bitti" : s.tur ? `Tur ${s.tur}/${s.toplam}` : "Hazırlanıyor"}</div>
+        <div class="count ${s.n && s.n !== lastCount ? "pop" : ""}">${countTxt}</div></div>
+      <div class="side b"><div class="name">${esc(m.b)}</div><div class="score">${s.skor[m.b] ?? 0}</div></div>
+    </div>
+    <div class="picks">${card(m.a)}${card(m.b)}</div>
+    <div class="verdict">${s.bitti ? finalText(m, s) : s.verdict}</div>`;
+  lastCount = s.n;
+
+  $("#logPanel").style.display = s.rows.length ? "" : "none";
+  $("#log").innerHTML = s.rows.slice().reverse().map(r =>
+    `<div class="row"><span class="muted mono">Tur ${r.tur}</span><span>${esc(r.picks)}${r.oyuncu ? ` → <b>${esc(r.oyuncu)}</b>` : ""}</span>
+     <span class="w">${r.w ? "+1 " + esc(r.w) : "—"}</span></div>`).join("");
+}
+function finalText(m, s) {
+  const a = s.skor[m.a], b = s.skor[m.b];
+  const ort = s.ort ? ` <span class="muted mono" style="font-size:13px">(ort. ${m.a}: ${s.ort[m.a] ?? "-"} ms · ${m.b}: ${s.ort[m.b] ?? "-"} ms)</span>` : "";
+  return (a === b ? "Berabere!" : `<b>${esc(a > b ? m.a : m.b)}</b> kazandı!`) + ort;
+}
+
+// ------------------------------------------------------------ canli baglanti
+function connect() {
+  const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/izle");
+  ws.onmessage = e => {
+    const d = JSON.parse(e.data);
+    if (d.tip === "lobi") {
+      lobby = d; renderBots();
+      if (watching == null && lobby.canli.length) watching = lobby.canli[0].no;
+      renderStage();
+    } else if (d.tip === "gecmis") {
+      const basla = d.olaylar.find(x => x.ev === "basla");
+      matches[d.no] = { a: basla?.botlar[0], b: basla?.botlar[1], olaylar: d.olaylar };
+      if (watching == null) watching = d.no;
+      renderStage();
+    } else if (d.tip === "mac") {
+      if (d.ev.ev === "basla") {
+        matches[d.no] = { a: d.ev.botlar[0], b: d.ev.botlar[1], olaylar: [] };
+        if (watching == null || (typeof watching === "number" && !lobby.canli.some(c => c.no === watching))) watching = d.no;
+      }
+      matches[d.no]?.olaylar.push(d.ev);
+      if (watching === d.no) renderStage();
+    } else if (d.tip === "mac_kaydedildi") {
+      loadHistory();
+    }
+  };
+  ws.onclose = () => setTimeout(connect, 1500);
+}
+
+checkMe(); renderStage(); loadHistory(); connect();
+</script>
+</body>
+</html>
