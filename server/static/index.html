@@ -33,6 +33,7 @@ header { display: flex; align-items: center; justify-content: space-between; gap
 .btn:hover { filter: brightness(1.1); }
 .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
 .btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.soft { background: var(--panel2); color: var(--muted); border: 1px solid var(--line); }
 
 main { display: grid; grid-template-columns: 300px 1fr; gap: 20px; padding: 20px 24px;
   max-width: 1280px; margin: 0 auto; position: relative; }
@@ -213,13 +214,13 @@ async function checkMe() {
   if (!token) return renderMe();
   const r = await fetch("/api/ben", { headers: { Authorization: "Bearer " + token } });
   if (r.ok) me = (await r.json()).ad; else { token = null; store.set("fq_token", null); }
-  renderMe(); renderBots();
+  renderMe(); renderBots(); renderStage();
 }
 function renderMe() {
   $("#me").innerHTML = me
     ? `<span class="muted">Botun:</span> <b>${esc(me)}</b> <button class="btn ghost" id="logout">Çıkış</button>`
     : `<button class="btn" id="openAuth">Botunu kaydet / giriş</button>`;
-  if (me) $("#logout").onclick = () => { me = null; token = null; store.set("fq_token", null); renderMe(); renderBots(); };
+  if (me) $("#logout").onclick = () => { me = null; token = null; store.set("fq_token", null); renderMe(); renderBots(); renderStage(); };
   else $("#openAuth").onclick = openAuth;
 }
 function openAuth() {
@@ -263,15 +264,32 @@ function renderBots() {
   }
   const mine = lobby.botlar.find(b => b.ad === me);
   el.innerHTML = lobby.botlar.map(b => {
-    let action = "";
-    if (b.ad === me) action = `<span class="muted" style="font-size:12px">sen</span>`;
-    else if (me) action = `<button class="btn" data-davet="${esc(b.ad)}" ${b.mesgul || !mine || mine.mesgul ? "disabled" : ""}>Davet</button>`;
+    const action = b.ad === me ? `<span class="muted" style="font-size:12px">sen</span>`
+      : `<button class="btn ${davetEngeli(b, mine) ? "soft" : ""}" data-davet="${esc(b.ad)}">Davet</button>`;
     return `<div class="bot"><span class="dot ${b.mesgul ? "busy" : ""}"></span>
       <span class="ad">${esc(b.ad)}</span><span class="ping mono muted">${b.ping} ms</span>${action}</div>`;
   }).join("");
-  if (me && !mine) el.insertAdjacentHTML("beforeend",
-    `<div class="empty">Senin botun (${esc(me)}) bağlı değil. Davet atmak için önce <span class="mono">bagla.py</span>'yi çalıştır.</div>`);
-  el.querySelectorAll("[data-davet]").forEach(b => b.onclick = () => invite(b.dataset.davet, b));
+  if (me && !mine) el.insertAdjacentHTML("beforeend", baglaYardim());
+  el.querySelectorAll("[data-davet]").forEach(b => b.onclick = () => {
+    const engel = davetEngeli(lobby.botlar.find(x => x.ad === b.dataset.davet), lobby.botlar.find(x => x.ad === me));
+    if (engel === "giris") return openAuth();
+    if (engel) return toast(engel);
+    invite(b.dataset.davet, b);
+  });
+}
+// Davet neden atilamaz? null = atilabilir
+function davetEngeli(rakip, mine) {
+  if (!me) return "giris";
+  if (!mine) return `Önce kendi botunu (${me}) bağla: aşağıdaki komutu terminalde çalıştır.`;
+  if (mine.mesgul) return "Botun şu an maçta, bitince tekrar dene.";
+  if (!rakip || rakip.mesgul) return "Rakip bot şu an maçta.";
+  return null;
+}
+function baglaYardim() {
+  const cmd = `python bagla.py bots/claude_bot.py --token ${token} --sunucu ${location.origin}`;
+  return `<div class="empty"><b style="color:var(--gold)">Botun (${esc(me)}) bağlı değil.</b>
+    Davet atabilmek için FootbalQuiz klasöründe terminalde çalıştır:
+    <div class="code" style="user-select:all">${esc(cmd)}</div></div>`;
 }
 async function invite(rakip, btn) {
   btn.disabled = true; btn.textContent = "...";
