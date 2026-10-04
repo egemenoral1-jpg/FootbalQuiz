@@ -7,6 +7,7 @@ Ortam:     PORT, DB_YOLU (sqlite dosyasi)
 import asyncio
 import collections
 import hashlib
+import hmac
 import itertools
 import json
 import os
@@ -26,8 +27,28 @@ MAX_TUR = 30
 DAVET_SURE = 15  # sn: davet edilen bot bu surede kabul etmeli
 
 
-def hash_token(tok):
-    return hashlib.sha256(tok.encode()).hexdigest()
+# Token'lar imzali: "<ad>.<rastgele>.<imza>". Sunucu bot listesini diskte tutmaz,
+# boylece ucretsiz hostinglerde disk silinse de token'lar gecerli kalir.
+# TOKEN_SECRET degisirse eski token'lar gecersiz olur.
+SECRET = os.environ.get("TOKEN_SECRET", "yerel-gelistirme-anahtari").encode()
+
+
+def imza(govde):
+    return hmac.new(SECRET, govde.encode(), hashlib.sha256).hexdigest()[:24]
+
+
+def token_uret(ad):
+    govde = f"{ad}.{secrets.token_urlsafe(9)}"
+    return f"{govde}.{imza(govde)}"
+
+
+def token_ad(tok):
+    """Gecerli token ise bot adini dondurur."""
+    govde, _, sig = (tok or "").rpartition(".")
+    if not govde or not hmac.compare_digest(sig, imza(govde)):
+        return None
+    ad = govde.rpartition(".")[0]
+    return ad if NAME_RE.match(ad) else None
 
 
 # ---------------------------------------------------------------- kalici veri
@@ -35,25 +56,10 @@ class Store:
     def __init__(self, path):
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.executescript("""
-            CREATE TABLE IF NOT EXISTS bots (
-                ad TEXT PRIMARY KEY COLLATE NOCASE, token TEXT NOT NULL, olusturma REAL);
             CREATE TABLE IF NOT EXISTS maclar (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, a TEXT, b TEXT, skor_a INT,
                 skor_b INT, tarih REAL, olaylar TEXT);
         """)
-
-    def kayit(self, ad):
-        tok = secrets.token_urlsafe(24)
-        try:
-            self.db.execute("INSERT INTO bots VALUES (?,?,?)", (ad, hash_token(tok), time.time()))
-            self.db.commit()
-        except sqlite3.IntegrityError:
-            return None
-        return tok
-
-    def kim(self, tok):
-        row = self.db.execute("SELECT ad FROM bots WHERE token=?", (hash_token(tok or ""),)).fetchone()
-        return row[0] if row else None
 
     def mac_kaydet(self, a, b, skor, olaylar):
         cur = self.db.execute("INSERT INTO maclar (a,b,skor_a,skor_b,tarih,olaylar) VALUES (?,?,?,?,?,?)",
@@ -145,14 +151,16 @@ class Site:
         ad = (body.get("ad") or "").strip()
         if not NAME_RE.match(ad):
             return web.json_response({"hata": "Isim 3-20 karakter: harf, rakam, _ veya -"}, status=400)
-        tok = self.store.kayit(ad)
-        if not tok:
-            return web.json_response({"hata": "Bu isim alinmis"}, status=409)
-        return web.json_response({"ad": ad, "token": tok})
+        if ad.lower() in (n.lower() for n in self.online):
+            return web.json_response({"hata": "Bu isimde bir bot su an bagli, baska isim sec"},
+                                     status=409)
+        return web.json_response({"ad": ad, "token": token_uret(ad)})
+
+    def token(self, req):
+        return req.headers.get("Authorization", "").removeprefix("Bearer ").strip()
 
     def auth(self, req):
-        h = req.headers.get("Authorization", "")
-        return self.store.kim(h.removeprefix("Bearer ").strip())
+        return token_ad(self.token(req))
 
     async def api_ben(self, req):
         ad = self.auth(req)
@@ -253,9 +261,15 @@ class Site:
             return web.json_response({"hata": "Gecersiz token"}, status=401)
         ws = web.WebSocketResponse(heartbeat=25, max_msg_size=2**20)
         await ws.prepare(req)
-        if ad in self.online:  # ayni bot ikinci kez baglanirsa eskisini kapat
-            await self.online[ad].ws.close()
+        eski = self.online.get(ad)
+        if eski and eski.token != self.token(req):
+            # Ayni isimle baska biri bagli: o isim su an onun
+            await ws.close(code=4009, message=b"Bu isimde baska bir bot bagli")
+            return ws
+        if eski:  # ayni bot yeniden baglandi: eski baglantiyi kapat
+            await eski.ws.close()
         bot = RemoteBot(ad, ws)
+        bot.token = self.token(req)
         self.online[ad] = bot
         self.lobi_guncelle()
         await bot.raw({"k": "hosgeldin", "ad": ad})
